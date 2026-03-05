@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Simulador UVA (MVP)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="wrap">
+    <h1>Simulador UVA (MVP)</h1>
+    <p class="muted">
+      Calcula cuota francesa en <b>UVA</b> y la convierte a pesos. Opcional: proyecta cuotas en pesos con inflación mensual estimada.
+    </p>
+
+    <section class="card">
+      <div class="grid">
+        <label>
+          Monto (ARS)
+          <input id="montoArs" type="number" inputmode="numeric" min="0" step="1000" value="5000000">
+        </label>
+
+        <label>
+          Plazo (meses)
+          <input id="plazo" type="number" inputmode="numeric" min="1" step="1" value="24">
+        </label>
+
+        <label>
+          TNA (%)
+          <input id="tna" type="number" inputmode="decimal" min="0" step="0.01" value="80">
+        </label>
+
+        <label>
+          Inflación mensual esperada (%)
+          <input id="inflacion" type="number" inputmode="decimal" min="0" step="0.01" value="5">
+        </label>
+      </div>
+
+      <div class="row">
+        <button id="btnCalcular">Calcular</button>
+        <button id="btnCopiar" class="ghost" title="Copiar resumen">Copiar resumen</button>
+      </div>
+
+      <div id="status" class="status muted"></div>
+    </section>
+
+    <section class="card">
+      <h2>Resultado</h2>
+
+      <div class="kpis">
+        <div class="kpi">
+          <div class="kpi-label">UVA actual</div>
+          <div id="uvaActual" class="kpi-value">—</div>
+          <div id="uvaFecha" class="muted small">—</div>
+        </div>
+
+        <div class="kpi">
+          <div class="kpi-label">Capital</div>
+          <div id="capitalUva" class="kpi-value">—</div>
+          <div class="muted small">en UVA</div>
+        </div>
+
+        <div class="kpi">
+          <div class="kpi-label">Cuota fija</div>
+          <div id="cuotaUva" class="kpi-value">—</div>
+          <div class="muted small">en UVA (sist. francés)</div>
+        </div>
+
+        <div class="kpi">
+          <div class="kpi-label">1ra cuota (ARS)</div>
+          <div id="cuotaArs1" class="kpi-value">—</div>
+          <div class="muted small">a UVA de hoy</div>
+        </div>
+      </div>
+
+      <h3>Tabla (primeros 12 meses)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Mes</th>
+              <th>UVA estimada</th>
+              <th>Cuota (UVA)</th>
+              <th>Cuota (ARS)</th>
+              <th>Interés (UVA)</th>
+              <th>Amort. (UVA)</th>
+              <th>Saldo (UVA)</th>
+            </tr>
+          </thead>
+          <tbody id="tabla"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="muted small">
+      Nota: la proyección en pesos depende de la inflación mensual supuesta. La cuota en UVA es fija; en pesos varía con la UVA.
+    </footer>
+  </main>
+
+  <script src="simulator.js"></script>
+</body>
+</html>
