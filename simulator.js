@@ -64,14 +64,26 @@ async function fetchUVA() {
     throw new Error("No se encontró la serie de UVA.");
   }
 
-  const hoy = new Date().toISOString().split("T")[0];
+  // Fecha local de Argentina, no UTC
+  const hoy = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "America/Argentina/Buenos_Aires",
+  }).format(new Date());
 
-  // Toma la fecha vigente de hoy. Si no encuentra, usa la última disponible.
-  const datoHoy = serie.find((d) => d.fecha >= hoy) || serie[serie.length - 1];
+  // Tomar solo fechas <= hoy
+  const seriePasadaOVigente = serie.filter((d) => d.fecha <= hoy);
+
+  if (!seriePasadaOVigente.length) {
+    throw new Error("No encontré un valor de UVA vigente para hoy o una fecha anterior.");
+  }
+
+  // Nos quedamos con la más reciente <= hoy
+  const datoVigente = seriePasadaOVigente.reduce((a, b) =>
+    a.fecha > b.fecha ? a : b
+  );
 
   return {
-    valor: Number(datoHoy.valor),
-    fecha: datoHoy.fecha,
+    valor: Number(datoVigente.valor),
+    fecha: datoVigente.fecha,
     idVariable: id,
     descripcion: uvaVar.descripcion,
   };
