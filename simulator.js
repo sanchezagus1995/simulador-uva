@@ -20,28 +20,6 @@ function frenchPayment(P, i, n) {
 
 // ===== BCRA UVA fetch (v4) =====
 // v3 está deprecada; en v4 listamos variables y buscamos "Unidad de Valor Adquisitivo (UVA)".
-async function fetchUVA() {
-  const listUrl = "https://api.bcra.gob.ar/estadisticas/v4.0/Monetarias?Limit=10000&Offset=0";
-  const list = await (await fetch(listUrl)).json();
-  const results = list.results || [];
-
-  const uvaVar = results.find(v => {
-    const d = (v.descripcion || "").toLowerCase().trim();
-    return d === "unidad de valor adquisitivo (uva)" || d === "uva" || d.includes("unidad de valor adquisitivo");
-  });
-
-  if (!uvaVar) throw new Error("No encontré 'Unidad de Valor Adquisitivo (UVA)' en el listado del BCRA.");
-
-  const id = uvaVar.idVariable;
-
-  const detUrl = `https://api.bcra.gob.ar/estadisticas/v4.0/Monetarias/${id}?Limit=1&Offset=0`;
-  const det = await (await fetch(detUrl)).json();
-
-  const item = det.results?.[0]?.detalle?.[0];
-  if (!item) throw new Error("Respuesta inesperada al pedir el detalle de UVA.");
-
-  return { valor: Number(item.valor), fecha: item.fecha, idVariable: id, descripcion: uvaVar.descripcion };
-}
 
 // ===== UI =====
 const $ = (id) => document.getElementById(id);
