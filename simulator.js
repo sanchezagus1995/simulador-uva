@@ -2,14 +2,26 @@
 
 // ===== Helpers =====
 const fmtARS = (n) =>
-  new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(n);
+  new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(n);
 
 const fmtNum = (n, digits = 2) =>
-  new Intl.NumberFormat("es-AR", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(n);
+  new Intl.NumberFormat("es-AR", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(n);
+
+const $ = (id) => document.getElementById(id);
+
+function setStatus(msg) {
+  $("status").textContent = msg || "";
+}
 
 function monthlyRateFromTNA(tnaPct) {
-  // MVP: aproximación simple (TNA / 12).
-  return (tnaPct / 100) / 12;
+  return (Number(tnaPct) / 100) / 12;
 }
 
 function frenchPayment(P, i, n) {
@@ -18,141 +30,209 @@ function frenchPayment(P, i, n) {
   return P * (i * pow) / (pow - 1);
 }
 
-// ===== BCRA UVA fetch (v4) =====
-// v3 está deprecada; en v4 listamos variables y buscamos "Unidad de Valor Adquisitivo (UVA)".
+// ===== BCRA UVA =====
+async function fetchUVA() {
+  const listUrl =
+    "https://api.bcra.gob.ar/estadisticas/v4.0/Monetarias?Limit=10000&Offset=0";
 
-// ===== UI =====
-const $ = (id) => document.getElementById(id);
+  const listResp = await fetch(listUrl);
+  const list = await listResp.json();
+  const results = list.results || [];
 
-function setStatus(msg) { $("status").textContent = msg || ""; }
+  const uvaVar = results.find((v) => {
+    const d = (v.descripcion || "").toLowerCase().trim();
+    return (
+      d === "unidad de valor adquisitivo (uva)" ||
+      d === "uva" ||
+      d.includes("unidad de valor adquisitivo")
+    );
+  });
 
-function buildSchedule({ montoArs, plazo, tnaPct, inflacionPct, uvaHoy }) {
-  const i = monthlyRateFromTNA(tnaPct);
-  const infl = (inflacionPct / 100);
-
-  // Capital en UVA (se “indexa” automáticamente cuando lo pasás a pesos)
-  const P_uva = montoArs / uvaHoy;
-
-  // Cuota fija en UVA por sistema francés
-  const cuota_uva = frenchPayment(P_uva, i, plazo);
-
-  let saldo = P_uva;
-  const rows = [];
-
-  for (let m = 1; m <= Math.min(plazo, 12); m++) {
-    // Interés y amortización en UVA
-    const interes_uva = saldo * i;
-    const capital_uva = cuota_uva - interes_uva; // amortización
-    saldo = Math.max(0, saldo - capital_uva);
-
-    // UVA estimada del mes (para convertir a pesos). Mes 1 usa UVA de hoy.
-    const uvaEst = uvaHoy * Math.pow(1 + infl, (m - 1));
-
-    // IVA: en la práctica suele calcularse sobre el interés.
-    const iva_uva = interes_uva * 0.21;
-
-    // Cuota pura (capital + interés), y cuota total en UVA (sumando IVA)
-    const cuota_pura_uva = capital_uva + interes_uva; // = cuota_uva (por definición)
-    const total_cuota_uva = cuota_pura_uva + iva_uva;
-
-    // Total cuota en pesos (según UVA del mes)
-    const total_cuota_ars = total_cuota_uva * uvaEst;
-
-    rows.push({
-      m,
-      capital_uva,
-      interes_uva,
-      iva_uva,
-      cuota_pura_uva,
-      total_cuota_uva,
-      total_cuota_ars,
-      uvaEst,
-      saldo
-    });
+  if (!uvaVar) {
+    throw new Error("No encontré la variable UVA en el listado del BCRA.");
   }
 
-  return { P_uva, cuota_uva, rows };
+  const id = uvaVar.idVariable;
+  const detUrl = `https://api.bcra.gob.ar/estadisticas/v4.0/Monetarias/${id}`;
+
+  const detResp = await fetch(detUrl);
+  const det = await detResp.json();
+
+  const serie = det.results?.[0]?.detalle || [];
+
+  if (!serie.length) {
+    throw new Error("No se encontró la serie de UVA.");
+  }
+
+  const hoy = new Date().toISOString().split("T")[0];
+
+  // Toma la fecha vigente de hoy. Si no encuentra, usa la última disponible.
+  const datoHoy = serie.find((d) => d.fecha >= hoy) || serie[serie.length - 1];
+
+  return {
+    valor: Number(datoHoy.valor),
+    fecha: datoHoy.fecha,
+    idVariable: id,
+    descripcion: uvaVar.descripcion,
+  };
 }
 
+// ===== Cálculo =====
+function buildSchedule({ montoArs, plazo, tnaPct, inflacionPct, uvaHoy }) {
+  const i = monthlyRateFromTNA(tnaPct);
+  const infl = Number(inflacionPct) / 100;
+
+  const capitalInicialUva = montoArs / uvaHoy;
+  const cuotaPuraUvaFija = frenchPayment(capitalInicialUva, i, plazo);
+
+  let saldo = capitalInicialUva;
+  const rows = [];
+
+  for (let cuota = 1; cuota <= Math.min(plazo, 12); cuota++) {
+    const interesUva = saldo * i;
+    const capitalUva = cuotaPuraUvaFija - interesUva;
+    const saldoNuevo = Math.max(0, saldo - capitalUva);
+
+    const uvaEstimada = uvaHoy * Math.pow(1 + infl, cuota - 1);
+
+    const ivaUva = interesUva * 0.21;
+    const cuotaPuraUva = capitalUva + interesUva;
+    const totalCuotaUva = cuotaPuraUva + ivaUva;
+    const totalCuotaArs = totalCuotaUva * uvaEstimada;
+
+    rows.push({
+      cuota,
+      capitalUva,
+      interesUva,
+      ivaUva,
+      cuotaPuraUva,
+      totalCuotaUva,
+      totalCuotaArs,
+      uvaEstimada,
+      saldoUva: saldoNuevo,
+    });
+
+    saldo = saldoNuevo;
+  }
+
+  return {
+    capitalInicialUva,
+    cuotaPuraUvaFija,
+    rows,
+  };
+}
+
+// ===== Render =====
 function renderTable(rows) {
   const tbody = $("tabla");
-  tbody.innerHTML = rows.map(r => `
-    <tr>
-      <td>${r.m}</td>
-      <td>${fmtNum(r.capital_uva, 4)}</td>
-      <td>${fmtNum(r.interes_uva, 4)}</td>
-      <td>${fmtNum(r.iva_uva, 4)}</td>
-      <td>${fmtNum(r.cuota_pura_uva, 4)}</td>
-      <td>${fmtNum(r.total_cuota_uva, 4)}</td>
-      <td>${fmtARS(r.total_cuota_ars)}</td>
-    </tr>
-  `).join("");
+
+  tbody.innerHTML = rows
+    .map(
+      (r) => `
+      <tr>
+        <td>${r.cuota}</td>
+        <td>${fmtNum(r.capitalUva, 4)}</td>
+        <td>${fmtNum(r.interesUva, 4)}</td>
+        <td>${fmtNum(r.ivaUva, 4)}</td>
+        <td>${fmtNum(r.cuotaPuraUva, 4)}</td>
+        <td>${fmtNum(r.totalCuotaUva, 4)}</td>
+        <td>${fmtARS(r.totalCuotaArs)}</td>
+      </tr>
+    `
+    )
+    .join("");
 }
 
-function buildSummary({ montoArs, plazo, tnaPct, inflacionPct, uva, P_uva, cuota_uva, totalCuotaArs1 }) {
+function buildSummary({
+  montoArs,
+  plazo,
+  tnaPct,
+  inflacionPct,
+  uva,
+  capitalInicialUva,
+  cuotaPuraUvaFija,
+  totalCuotaArs1,
+}) {
   return [
-    `Simulador UVA (MVP)`,
-    `UVA (${uva.fecha}): $${fmtNum(uva.valor, 2)} (BCRA idVariable ${uva.idVariable})`,
+    "Simulador UVA",
+    `UVA (${uva.fecha}): $${fmtNum(uva.valor, 2)}`,
     `Monto: ${fmtARS(montoArs)}`,
     `Plazo: ${plazo} meses`,
     `TNA: ${fmtNum(tnaPct, 2)}%`,
     `Inflación supuesta: ${fmtNum(inflacionPct, 2)}% mensual`,
-    `Capital (UVA): ${fmtNum(P_uva, 4)}`,
-    `Cuota fija (UVA): ${fmtNum(cuota_uva, 4)}`,
-    `1ra cuota TOTAL (ARS, incluye IVA sobre interés): ${fmtARS(totalCuotaArs1)}`
+    `Capital inicial (UVA): ${fmtNum(capitalInicialUva, 4)}`,
+    `Cuota pura fija (UVA): ${fmtNum(cuotaPuraUvaFija, 4)}`,
+    `1ra cuota total (ARS): ${fmtARS(totalCuotaArs1)}`,
   ].join("\n");
 }
 
+// ===== Principal =====
 async function calcular() {
   try {
-    setStatus("Buscando UVA en BCRA…");
-    const uva = await fetchUVA();
+    setStatus("Buscando UVA en BCRA...");
 
     const montoArs = Number($("montoArs").value || 0);
     const plazo = Number($("plazo").value || 0);
     const tnaPct = Number($("tna").value || 0);
     const inflacionPct = Number($("inflacion").value || 0);
 
-    if (montoArs <= 0 || plazo <= 0) throw new Error("Completá monto y plazo con valores válidos.");
+    if (montoArs <= 0 || plazo <= 0) {
+      throw new Error("Completá monto y plazo con valores válidos.");
+    }
+
+    const uva = await fetchUVA();
 
     $("uvaActual").textContent = `$${fmtNum(uva.valor, 2)}`;
     $("uvaFecha").textContent = `Fecha: ${uva.fecha}`;
 
-    const { P_uva, cuota_uva, rows } = buildSchedule({
-      montoArs, plazo, tnaPct, inflacionPct, uvaHoy: uva.valor
+    const { capitalInicialUva, cuotaPuraUvaFija, rows } = buildSchedule({
+      montoArs,
+      plazo,
+      tnaPct,
+      inflacionPct,
+      uvaHoy: uva.valor,
     });
 
-    // KPIs
-    $("capitalUva").textContent = fmtNum(P_uva, 4);
-    $("cuotaUva").textContent = fmtNum(cuota_uva, 4);
+    $("capitalUva").textContent = fmtNum(capitalInicialUva, 4);
+    $("cuotaUva").textContent = fmtNum(cuotaPuraUvaFija, 4);
 
-    // 1ra cuota TOTAL en ARS (sumando IVA sobre interés), usando UVA de hoy
-    const first = rows[0];
-    const totalCuotaArs1 = first.total_cuota_ars;
-    $("cuotaArs1").textContent = fmtARS(totalCuotaArs1);
+    const primera = rows[0];
+    $("cuotaArs1").textContent = fmtARS(primera.totalCuotaArs);
 
     renderTable(rows);
 
-    // Guardar summary para copiar
     window.__summary = buildSummary({
-      montoArs, plazo, tnaPct, inflacionPct, uva, P_uva, cuota_uva, totalCuotaArs1
+      montoArs,
+      plazo,
+      tnaPct,
+      inflacionPct,
+      uva,
+      capitalInicialUva,
+      cuotaPuraUvaFija,
+      totalCuotaArs1: primera.totalCuotaArs,
     });
 
-    setStatus(`Listo. UVA tomada de BCRA (idVariable ${uva.idVariable}).`);
-  } catch (e) {
-    console.error(e);
-    setStatus(`Error: ${e.message || e}`);
+    setStatus(`Listo. UVA tomada de BCRA (${uva.fecha}).`);
+  } catch (error) {
+    console.error(error);
+    setStatus(`Error: ${error.message || error}`);
   }
 }
 
-// Listeners
+// ===== Eventos =====
 $("btnCalcular").addEventListener("click", calcular);
+
 $("btnCopiar").addEventListener("click", async () => {
   const text = window.__summary || "Primero calculá para generar el resumen.";
+
   try {
     await navigator.clipboard.writeText(text);
     setStatus("Resumen copiado al portapapeles.");
-  } catch {
-    setStatus("No pude copiar automático. Seleccioná y copiá manualmente.");
+  } catch (error) {
+    console.error(error);
+    setStatus("No pude copiar el resumen.");
   }
 });
+
+// Mensaje inicial
+setStatus("Ingresá los datos y presioná Calcular.");
