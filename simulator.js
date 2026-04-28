@@ -593,9 +593,19 @@ if (comparar && tnaTradicional > 0) {
 }
 
 // ===== Eventos =====
+$("compararFrances")?.addEventListener("change", () => {
+  const activo = $("compararFrances").checked;
+  $("bloqueComparacionFrances").style.display = activo ? "block" : "none";
+
+  if (activo) {
+    calcular();
+  }
+});
+
 $("btnCalcular")?.addEventListener("click", calcular);
 
 $("btnCopiar")?.addEventListener("click", async () => {
+  
   const text = window.__summary || "Primero calculá para generar el resumen.";
 
   try {
@@ -609,13 +619,14 @@ $("btnCopiar")?.addEventListener("click", async () => {
 
 $("modoGastos")?.addEventListener("change", syncPorcentajeSegunSeleccion);
 $("plazo")?.addEventListener("change", syncPorcentajeSegunSeleccion);
-// Estado inicial
 
+// ===== Init =====
+syncPorcentajeSegunSeleccion();
+
+// 👇 estado inicial del bloque comparación
 const activoInicial = $("compararFrances")?.checked;
 if ($("bloqueComparacionFrances")) {
   $("bloqueComparacionFrances").style.display = activoInicial ? "block" : "none";
 }
 
-// ===== Init =====
-syncPorcentajeSegunSeleccion();
 setStatus("Ingresá los datos y presioná Calcular.");
