@@ -4,11 +4,18 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Simulador UVA</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="../shared/bcra.css" />
 </head>
 <body>
   <main class="wrap">
-    <h1>Simulador UVA</h1>
+    <div class="row">
+      <button onclick="history.back()" class="ghost">
+        ← Volver al menú
+      </button>
+    </div>
+
+    <h1> UVA</h1>
     <p class="muted">
       Calcula cuota <b>UVA</b>. Opcional: proyecta cuotas en pesos con inflación mensual estimada.
     </p>
@@ -17,22 +24,35 @@
       <div class="grid">
         <label>
           Monto (ARS)
-          <input id="montoArs" type="number" inputmode="numeric" min="0" step="1000" value="5000000">
+          <input id="montoArs" type="number" inputmode="numeric" min="0" step="1000" value="10000000">
         </label>
 
         <label>
           Plazo (meses)
-          <input id="plazo" type="number" inputmode="numeric" min="1" step="1" value="24">
+          <input id="plazo" type="number" inputmode="numeric" min="1" step="1" value="12">
         </label>
 
         <label>
           TNA (%)
-          <input id="tna" type="number" inputmode="decimal" min="0" step="0.01" value="80">
+          <input id="tna" type="number" inputmode="decimal" min="0" step="0.01" value="0">
         </label>
 
         <label>
           Inflación mensual esperada (%)
-          <input id="inflacion" type="number" inputmode="decimal" min="0" step="0.01" value="5">
+          <input id="inflacion" type="number" inputmode="decimal" min="0" step="0.01" value="0">
+        </label>
+
+        <label>
+          Tratamiento de gastos
+          <select id="modoGastos">
+            <option value="sumar" selected>Sumar gastos al monto</option>
+            <option value="restar">Restar gastos al monto</option>
+          </select>
+        </label>
+
+        <label>
+          % gastos entidad
+          <input id="porcentajeGastos" type="number" inputmode="decimal" min="0" step="0.01" value="13.31" readonly>
         </label>
       </div>
 
@@ -43,6 +63,8 @@
 
       <div id="status" class="status muted"></div>
     </section>
+
+    <div id="bcra-container"></div>
 
     <section class="card">
       <h2>Resultado</h2>
@@ -73,30 +95,107 @@
         </div>
       </div>
 
+      <h3>Resumen de monto</h3>
+      <div class="kpis">
+        <div class="kpi">
+          <div class="kpi-label" id="labelMontoIngresado">Monto base</div>
+          <div id="montoIngresado" class="kpi-value">—</div>
+          <div class="muted small">valor ingresado por el usuario</div>
+        </div>
+
+        <div class="kpi">
+          <div class="kpi-label">% gastos entidad</div>
+          <div id="porcentajeGastosAplicado" class="kpi-value">—</div>
+          <div class="muted small">según plazo y modo</div>
+        </div>
+
+        <div class="kpi">
+          <div class="kpi-label">Gastos entidad</div>
+          <div id="gastosEntidadArs" class="kpi-value">—</div>
+          <div class="muted small">importe calculado</div>
+        </div>
+
+        <div class="kpi">
+          <div class="kpi-label">% gastos Infinito</div>
+          <div id="porcentajeGastosInfinito" class="kpi-value">—</div>
+          <div class="muted small">9,09% o 10%</div>
+        </div>
+
+        <div class="kpi">
+          <div class="kpi-label">Gastos Infinito</div>
+          <div id="gastosInfinitoArs" class="kpi-value">—</div>
+          <div class="muted small">importe calculado</div>
+        </div>
+
+        <div class="kpi">
+          <div class="kpi-label" id="labelMontoFinal">Resultado final</div>
+          <div id="montoFinalCalculado" class="kpi-value">—</div>
+          <div class="muted small">resultado final según el modo</div>
+        </div>
+
+        <div class="kpi">
+          <div class="kpi-label">Neto cliente</div>
+          <div id="netoClienteArs" class="kpi-value">—</div>
+          <div class="muted small">monto que recibe efectivamente</div>
+        </div>
+      </div>
+
       <h3>Tabla (primeros 12 meses)</h3>
       <div class="table-wrap">
         <table>
-         <thead>
-<tr>
-<th>Cant Cuotas</th>
-<th>Capital</th>
-<th>Interés</th>
-<th>IVA</th>
-<th>Cuota Pura</th>
-<th>Total Cuota UVA</th>
-<th>Total Cuota</th>
-</tr>
-</thead>
+          <thead>
+            <tr>
+              <th>Cant Cuotas</th>
+              <th>Capital</th>
+              <th>Interés</th>
+              <th>IVA</th>
+              <th>Cuota Pura</th>
+              <th>Total Cuota UVA</th>
+              <th>Total Cuota</th>
+            </tr>
+          </thead>
           <tbody id="tabla"></tbody>
         </table>
       </div>
+      <h3>Comparación con tasa tradicional</h3>
+
+<div class="card">
+
+  <div class="row" style="margin-bottom: 10px;">
+    <label style="display:flex; align-items:center; gap:8px;">
+      <input type="checkbox" id="compararFrances">
+      Activar comparación
+    </label>
+  </div>
+
+  <div id="bloqueComparacionFrances" style="display:none;">
+
+    <div class="grid">
+      <label>
+        TNA tradicional (%)
+        <input id="tnaTradicional" type="number" step="0.01" placeholder="Ej: 75">
+      </label>
+    </div>
+
+    <div id="resultadoComparacionFrances" style="margin-top:15px;"></div>
+
+  </div>
+
+</div>
     </section>
 
     <footer class="muted small">
-      Nota: la proyección en pesos depende de la inflación mensual supuesta. La cuota en UVA es fija; en pesos varía con la UVA. 
+      Nota: la proyección en pesos depende de la inflación mensual supuesta. La cuota en UVA es fija; en pesos varía con la UVA.
     </footer>
   </main>
 
-  <script src="simulator.js"></script>
+  <script src="../shared/bcra.js"></script>
+  <script src="./simulator.js"></script>
+
+  <script>
+    renderBcraBlock("bcra-container", {
+      instanceId: "bcra-uva"
+    });
+  </script>
 </body>
 </html>
