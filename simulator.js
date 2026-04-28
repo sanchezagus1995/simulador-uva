@@ -356,28 +356,40 @@ function buildComparacionFrances({
   tnaPct
 }) {
   const i = monthlyRateFromTNA(tnaPct);
+  const cuotaPuraFrances = frenchPayment(montoFinanciado, i, plazo);
 
-  const cuotaFrances = frenchPayment(montoFinanciado, i, plazo);
-
+  let saldo = montoFinanciado;
   let mesCruce = null;
 
   const filas = rowsUva.map((r) => {
-    const diferencia = r.totalCuotaArs - cuotaFrances;
+    const interes = saldo * i;
+    const capital = cuotaPuraFrances - interes;
+    const iva = interes * 0.21;
+    const cuotaTotalFrances = cuotaPuraFrances + iva;
 
-    if (mesCruce === null && r.totalCuotaArs >= cuotaFrances) {
+    const diferencia = r.totalCuotaArs - cuotaTotalFrances;
+
+    if (mesCruce === null && r.totalCuotaArs >= cuotaTotalFrances) {
       mesCruce = r.cuota;
     }
+
+    saldo = Math.max(0, saldo - capital);
 
     return {
       mes: r.cuota,
       cuotaUva: r.totalCuotaArs,
-      cuotaFrances,
+      cuotaFrances: cuotaTotalFrances,
+      cuotaPuraFrances,
+      interesFrances: interes,
+      capitalFrances: capital,
+      ivaFrances: iva,
       diferencia,
     };
   });
 
   return {
-    cuotaFrances,
+    cuotaFrances: filas[0]?.cuotaFrances || 0,
+    cuotaPuraFrances,
     filas,
     mesCruce,
   };
