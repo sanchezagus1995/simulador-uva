@@ -609,6 +609,12 @@ $("btnCopiar")?.addEventListener("click", async () => {
 
 $("modoGastos")?.addEventListener("change", syncPorcentajeSegunSeleccion);
 $("plazo")?.addEventListener("change", syncPorcentajeSegunSeleccion);
+// Estado inicial
+
+const activoInicial = $("compararFrances")?.checked;
+if ($("bloqueComparacionFrances")) {
+  $("bloqueComparacionFrances").style.display = activoInicial ? "block" : "none";
+}
 
 // ===== Init =====
 syncPorcentajeSegunSeleccion();
