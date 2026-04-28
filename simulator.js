@@ -1,4 +1,4 @@
-// simulador.js
+// simulador.jss
 
 // ===== Helpers =====
 const fmtARS = (n) =>
