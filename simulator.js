@@ -496,7 +496,7 @@ function renderComparacionFrances(data) {
   cont.innerHTML = `
     <h3>Comparación UVA vs Tradicional</h3>
     <p><strong>${mensaje}</strong></p>
-    <p>Cuota francesa: ${fmtARS(cuotaFrances)}</p>
+    <p>Cuota tradicional: ${fmtARS(cuotaFrances)}</p>
 
     <table>
       <thead>
