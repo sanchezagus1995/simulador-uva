@@ -315,7 +315,7 @@ function buildSchedule({ montoArs, plazo, tnaPct, inflacionPct, uvaHoy }) {
   let saldo = capitalInicialUva;
   const rows = [];
 
-  for (let cuota = 1; cuota <= Math.min(plazo, 12); cuota++) {
+  for (let cuota = 1; cuota <= plazo; cuota++) {
     const interesUva = saldo * i;
     const capitalUva = cuotaPuraUvaFija - interesUva;
     const saldoNuevo = Math.max(0, saldo - capitalUva);
